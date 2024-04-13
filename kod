@@ -1,0 +1,84 @@
+#include <ESP8266WiFi.h>
+
+const char* ssid = "Adanali";
+const char* password = "karsiyaka01";
+
+WiFiServer server(80);
+
+// Dijital pinlerdeki LDR'lerin GPIO numaraları
+const int ldrPins[] = {16, 5, 4, 0, 2, 14}; // D0, D1, D2, D3, D4, D5
+const int numLDRs = 6;
+
+void setup() {
+  Serial.begin(115200);
+  delay(100);
+
+  Serial.println();
+  Serial.print("Connecting to ");
+  Serial.println(ssid);
+
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("");
+  Serial.println("WiFi connected");
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
+
+  server.begin();
+}
+
+void loop() {
+  WiFiClient client = server.available();
+  if (!client) {
+    return;
+  }
+
+  Serial.println("New client");
+  while (!client.available()) {
+    delay(1);
+  }
+
+  String request = client.readStringUntil('\r');
+  Serial.println(request);
+  client.flush();
+
+  int ldrValues[numLDRs];
+  for (int i = 0; i < numLDRs; i++) {
+    pinMode(ldrPins[i], INPUT);
+    ldrValues[i] = digitalRead(ldrPins[i]);
+  }
+
+  client.println("HTTP/1.1 200 OK");
+  client.println("Content-Type: text/html");
+  client.println("Connection: close");
+  client.println();
+
+  client.println("<!DOCTYPE HTML>");
+  client.println("<html>");
+  client.println("<head><title>LDR Değerleri</title></head>");
+  client.println("<body>");
+
+  client.println("<h1>LDR Değerleri</h1>");
+  for (int i = 0; i < numLDRs; i++) {
+    client.print("LDR ");
+    client.print(i + 1);
+    client.print(" - Değer: ");
+    if (ldrValues[i] == HIGH) {
+      client.println("Boş"); // Karanlıkta
+    } else {
+      client.println("Dolu"); // Aydınlıkta
+    }
+    client.println("<br>");
+  }
+
+  client.println("</body>");
+  client.println("</html>");
+
+  delay(1);
+  Serial.println("Client disconnected");
+}
